@@ -89,13 +89,13 @@ The project is split into a React client and a Node.js/Express server, with Mong
 The application defines six roles with enforced RBAC on both backend routes and frontend components:
 
 | Role | Access Level |
-|---|---|
-| `super_admin` | Full access to all modules, user management, and company settings |
-| `finance_manager` | Billing, payments, R2R, reports — no vendor write or admin panel |
-| `procurement_officer` | Vendors, full P2P cycle, purchase orders |
-| `sales_executive` | Customers, sales orders, order-to-cash, billing write |
-| `auditor` | Read-only across all modules except admin panel |
-| `viewer` | Dashboard only — no write access anywhere |
+|:--- |:--- |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/crown.svg" width="18" align="center" /> **super_admin** | Full access to all modules, user management, and company settings |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/landmark.svg" width="18" align="center" /> **finance_manager** | Billing, payments, R2R, reports — no vendor write or admin panel |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/shopping-bag.svg" width="18" align="center" /> **procurement_officer** | Vendors, full P2P cycle, purchase orders |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/briefcase.svg" width="18" align="center" /> **sales_executive** | Customers, sales orders, order-to-cash, billing write |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/microscope.svg" width="18" align="center" /> **auditor** | Read-only across all modules except admin panel |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/eye.svg" width="18" align="center" /> **viewer** | Dashboard only — no write access anywhere |
 
 RBAC is enforced via:
 - `authMiddleware.js` — verifies JWT, attaches `req.user`
@@ -108,17 +108,17 @@ RBAC is enforced via:
 
 ## AI Features (Google Gemini)
 
-All AI calls are routed through `server/services/geminiService.js` using `gemini-1.5-flash`.
+All AI calls are routed through `server/services/geminiService.js` using `gemini-2.5-flash`.
 
 | Feature | Trigger | Output |
 |---|---|---|
-| Financial Health Summary | Dashboard load | 2–3 sentence plain-English KPI summary |
-| Vendor Risk Scoring | Vendor detail view | Score 0–100 + reason + recommendation |
-| Late Payer Prediction | AR Tracker page | Likelihood (high/medium/low) per customer |
-| Payment Timing Optimization | Creating a payment run | Recommended pay-now vs defer schedule |
-| Journal Anomaly Detection | Finance manager views journal list | Flagged entries with reasons |
-| Invoice Description Drafting | AI Assist button on invoice line item | Professional description under 15 words |
-| Natural Language Report Query | NLQueryReport page | MongoDB filter object from plain English |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/heart-pulse.svg" width="18" align="center" /> **Financial Health Summary** | Dashboard load | 2–3 sentence plain-English KPI summary |
+|<img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/shield-alert.svg" width="18" align="center" /> **Vendor Risk Scoring** | Vendor detail view | Score 0–100 + reason + recommendation |
+|<img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/trending-down.svg" width="18" align="center" /> **Late Payer Prediction** | AR Tracker page | Likelihood (high/medium/low) per customer |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/timer.svg" width="18" align="center" />**Payment Timing Optimization** | Creating a payment run | Recommended pay-now vs defer schedule |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/search-code.svg" width="18" align="center" />**Journal Anomaly Detection** | Finance manager views journal list | Flagged entries with reasons |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/pen-tool.svg" width="18" align="center" />**Invoice Description Drafting** | AI Assist button on invoice line item | Professional description under 15 words |
+|<img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/messages-square.svg" width="18" align="center" /> **NL Report Query** | NLQueryReport page | MongoDB filter object from plain English |
 
 ---
 
