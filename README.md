@@ -1,4 +1,4 @@
- # <lucide-react-zap /> ProBill ERP
+ #  <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/zap.svg" width="24" height="24" /> ProBill ERP 
 
 **SAP S/4 HANA-Inspired Professional Billing & Financial Management Software**
 MERN Stack · Tailwind CSS · Google Gemini AI · 100% Free Tier
