@@ -67,20 +67,20 @@ The project is split into a React client and a Node.js/Express server, with Mong
 ## Functional Modules
 
 | Module | Description |
-|---|---|
-| **Authentication** | Register, login, logout, JWT, profile, password update, forgot/reset password |
-| **Dashboard** | KPI cards, revenue trend chart, invoice status breakdown, AI financial summary |
-| **Vendors** | Full CRUD, status management (pending → verified → blacklisted), AI risk scoring |
-| **Billing** | Sales and purchase invoices, payment recording, PDF generation, email sending |
-| **Purchasing (P2P)** | Purchase requisitions, purchase orders, goods receipt notes, 3-way match |
-| **Orders (O2C)** | Customers, sales orders, delivery notes, invoice generation, AR aging |
-| **Payments** | Pending invoice selection, SAP-style payment proposal, approval, execution, CSV bank export |
-| **General Ledger (R2R)** | Chart of accounts, journal entries, posting, reversal, trial balance, P&L, balance sheet |
-| **Fiscal Periods** | Lock/unlock accounting periods to prevent backdated journal entries |
-| **Analytics** | Cash flow, KPI trends, vendor/customer analytics, Excel export, AI summaries |
-| **AI Features** | 7 Gemini-powered features across the application |
-| **Settings / Admin** | Company profile, user management, role changes, tax config, audit logs |
-| **Notifications** | Inbox, unread badge, mark read, overdue checks via cron |
+|:--- |:--- |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/fingerprint.svg" width="18" align="center" /> **Authentication** | Register, login, logout, JWT, profile, password update, forgot/reset password |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/layout-dashboard.svg" width="18" align="center" /> **Dashboard** | KPI cards, revenue trend chart, invoice status breakdown, AI financial summary |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/users.svg" width="18" align="center" /> **Vendors** | Full CRUD, status management (pending → verified → blacklisted), AI risk scoring |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/receipt.svg" width="18" align="center" /> **Billing** | Sales and purchase invoices, payment recording, PDF generation, email sending |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shopping-cart.svg" width="18" align="center" /> **Purchasing (P2P)** | Purchase requisitions, purchase orders, goods receipt notes, 3-way match |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/truck.svg" width="18" align="center" /> **Orders (O2C)** | Customers, sales orders, delivery notes, invoice generation, AR aging |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/credit-card.svg" width="18" align="center" /> **Payments** | Pending invoice selection, SAP-style payment proposal, approval, execution, CSV bank export |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/book-open.svg" width="18" align="center" /> **General Ledger (R2R)** | Chart of accounts, journal entries, posting, reversal, trial balance, P&L, balance sheet |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/calendar-range.svg" width="18" align="center" /> **Fiscal Periods** | Lock/unlock accounting periods to prevent backdated journal entries |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/line-chart.svg" width="18" align="center" /> **Analytics** | Cash flow, KPI trends, vendor/customer analytics, Excel export, AI summaries |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/brain-circuit.svg" width="18" align="center" /> **AI Features** | 7 Gemini-powered features across the application |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/settings.svg" width="18" align="center" /> **Settings / Admin** | Company profile, user management, role changes, tax config, audit logs |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/bell-ring.svg" width="18" align="center" /> **Notifications** | Inbox, unread badge, mark read, overdue checks via cron |
 
 ---
 
