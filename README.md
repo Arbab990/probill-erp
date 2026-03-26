@@ -18,45 +18,49 @@ The project is split into a React client and a Node.js/Express server, with Mong
 
 ### Frontend (`client/`)
 | Package | Purpose |
-|---|---|
-| React 18 + Vite 4 | UI framework and build tool |
-| Tailwind CSS 3.3 | Utility-first styling |
-| React Router 6 | Client-side routing |
-| Zustand 4 | Lightweight state management |
-| Axios 1.6 | HTTP client with interceptors |
-| Recharts 2.8 | Dashboard charts |
-| React Hook Form 7 | Form handling and validation |
-| @tanstack/react-table 8 | Headless data tables |
-| lucide-react | Icon library |
-| jsPDF + html2canvas | Client-side PDF export |
-| date-fns | Date formatting and manipulation |
-| react-hot-toast | Toast notifications |
+|:--- |:--- |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/atom.svg" width="18" align="center" /> **React 18 + Vite 4** | UI framework and build tool |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/palette.svg" width="18" align="center" /> **Tailwind CSS 3.3** | Utility-first styling |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/milestone.svg" width="18" align="center" /> **React Router 6** | Client-side routing |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/box.svg" width="18" align="center" /> **Zustand 4** | Lightweight state management |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/arrow-left-right.svg" width="18" align="center" /> **Axios 1.6** | HTTP client with interceptors |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/bar-chart-3.svg" width="18" align="center" /> **Recharts 2.8** | Dashboard charts |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/clipboard-check.svg" width="18" align="center" /> **React Hook Form 7** | Form handling and validation |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/table.svg" width="18" align="center" /> **@tanstack/react-table 8** | Headless data tables |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg" width="18" align="center" /> **lucide-react** | Icon library |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/file-up.svg" width="18" align="center" /> **jsPDF + html2canvas** | Client-side PDF export |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/calendar.svg" width="18" align="center" /> **date-fns** | Date formatting and manipulation |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/bell.svg" width="18" align="center" /> **react-hot-toast** | Toast notifications |
+
+---
 
 ### Backend (`server/`)
 | Package | Purpose |
-|---|---|
-| Express 4.18 | Web framework |
-| Mongoose 8 | MongoDB ODM with schema validation |
-| jsonwebtoken | Stateless JWT authentication |
-| bcryptjs | Password hashing |
-| helmet + cors | Security middleware |
-| express-rate-limit | API abuse prevention |
-| nodemailer | Invoice email delivery |
-| pdfkit | Server-side PDF generation |
-| @google/generative-ai | Gemini AI SDK |
-| node-cron | Recurring invoice and overdue reminders |
-| multer | File/document uploads |
-| express-validator | Request body validation |
-| morgan | HTTP request logging |
+|:--- |:--- |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/server.svg" width="18" align="center" /> **Express 4.18** | Web framework |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/database.svg" width="18" align="center" /> **Mongoose 8** | MongoDB ODM with schema validation |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/lock.svg" width="18" align="center" /> **jsonwebtoken** | Stateless JWT authentication |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/key.svg" width="18" align="center" /> **bcryptjs** | Password hashing |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shield-check.svg" width="18" align="center" /> **helmet + cors** | Security middleware |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/activity.svg" width="18" align="center" /> **express-rate-limit** | API abuse prevention |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/mail.svg" width="18" align="center" /> **nodemailer** | Invoice email delivery |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/file-text.svg" width="18" align="center" /> **pdfkit** | Server-side PDF generation |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/brain-circuit.svg" width="18" align="center" /> **@google/generative-ai** | Gemini AI SDK |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/clock.svg" width="18" align="center" /> **node-cron** | Recurring invoice and overdue reminders |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/upload-cloud.svg" width="18" align="center" /> **multer** | File/document uploads |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/check-circle-2.svg" width="18" align="center" /> **express-validator** | Request body validation |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/terminal.svg" width="18" align="center" /> **morgan** | HTTP request logging |
+
+---
 
 ### External Services (All Free Tier)
 | Service | Purpose | Free Limit |
-|---|---|---|
-| MongoDB Atlas | Database hosting | M0 Sandbox — 512 MB |
-| Google Gemini API | AI features | 15 RPM, 1M tokens/day |
-| Gmail SMTP | Email sending | 500 emails/day |
-| Render.com | Backend deploy | 750 hrs/month |
-| Vercel | Frontend deploy | Unlimited (hobby) |
+|:--- |:--- |:--- |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/hard-drive.svg" width="18" align="center" /> **MongoDB Atlas** | Database hosting | M0 Sandbox — 512 MB |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/bot.svg" width="18" align="center" /> **Google Gemini API** | AI features | 15 RPM, 1M tokens/day |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/send.svg" width="18" align="center" /> **Gmail SMTP** | Email sending | 500 emails/day |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/cloud-upload.svg" width="18" align="center" /> **Render.com** | Backend deploy | 750 hrs/month |
+| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/zap.svg" width="18" align="center" /> **Vercel** | Frontend deploy | Unlimited (hobby) |
 
 ---
 
