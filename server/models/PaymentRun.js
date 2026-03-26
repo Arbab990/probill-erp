@@ -9,7 +9,7 @@ const auditLogSchema = new mongoose.Schema({
 
 const paymentRunSchema = new mongoose.Schema(
     {
-        runNumber: { type: String },  // unique per company — no global index needed
+        runNumber: { type: String },  // unique per company — enforced by compound index below
         name: { type: String, required: true, trim: true },
         type: { type: String, enum: ['outgoing', 'incoming'], default: 'outgoing' },
         paymentMethod: {
@@ -134,5 +134,7 @@ paymentRunSchema.pre('save', async function (next) {
     this.runNumber = `PAY-${year}-${String(nextNum).padStart(4, '0')}`;
     next();
 });
+
+paymentRunSchema.index({ company: 1, runNumber: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('PaymentRun', paymentRunSchema);

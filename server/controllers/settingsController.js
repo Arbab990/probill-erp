@@ -2,6 +2,7 @@ import User from '../models/User.js';
 import Company from '../models/Company.js';
 import AuditLog from '../models/AuditLog.js';
 import { logAudit } from '../services/auditService.js';
+import bcrypt from 'bcryptjs';
 
 
 // ════════════════════════════════════════════════

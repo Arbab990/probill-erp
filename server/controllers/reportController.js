@@ -9,10 +9,13 @@ export const getDashboardStats = async (req, res, next) => {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-        // ── Revenue this month (paid sales invoices) ──
+        // ── Revenue this month — use actual payment date, not updatedAt ──
+        // Unwind paymentHistory so we can filter by the date money was received
         const revenueThisMonth = await Invoice.aggregate([
-            { $match: { company: companyId, type: 'sales', status: 'paid', updatedAt: { $gte: startOfMonth } } },
-            { $group: { _id: null, total: { $sum: '$total' } } },
+            { $match: { company: companyId, type: 'sales', status: 'paid' } },
+            { $unwind: '$paymentHistory' },
+            { $match: { 'paymentHistory.date': { $gte: startOfMonth } } },
+            { $group: { _id: null, total: { $sum: '$paymentHistory.amount' } } },
         ]);
 
         // ── Total outstanding (sent + overdue sales) ──
@@ -41,11 +44,19 @@ export const getDashboardStats = async (req, res, next) => {
             { $group: { _id: '$status', count: { $sum: 1 }, total: { $sum: '$total' } } },
         ]);
 
-        // ── Revenue trend — last 6 months ──
+        // ── Revenue trend — last 6 months by actual payment date ──
         const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
         const revenueTrend = await Invoice.aggregate([
-            { $match: { company: companyId, type: 'sales', status: 'paid', issueDate: { $gte: sixMonthsAgo } } },
-            { $group: { _id: { year: { $year: '$issueDate' }, month: { $month: '$issueDate' } }, revenue: { $sum: '$total' }, count: { $sum: 1 } } },
+            { $match: { company: companyId, type: 'sales', status: 'paid' } },
+            { $unwind: '$paymentHistory' },
+            { $match: { 'paymentHistory.date': { $gte: sixMonthsAgo } } },
+            {
+                $group: {
+                    _id: { year: { $year: '$paymentHistory.date' }, month: { $month: '$paymentHistory.date' } },
+                    revenue: { $sum: '$paymentHistory.amount' },
+                    count: { $sum: 1 },
+                },
+            },
             { $sort: { '_id.year': 1, '_id.month': 1 } },
         ]);
 
@@ -90,5 +101,47 @@ export const getDashboardStats = async (req, res, next) => {
                 recentInvoices,
             },
         });
+    } catch (err) { next(err); }
+};
+// GET /api/reports/ap-aging
+export const getAPAgingReport = async (req, res, next) => {
+    try {
+        const now = new Date();
+        const invoices = await Invoice.find({
+            company: req.user.company,
+            type: 'purchase',
+            status: { $in: ['sent', 'overdue', 'partially_paid'] },
+        }).populate('vendor', 'name email');
+
+        const buckets = { current: [], days30: [], days60: [], days90: [], over90: [] };
+        const totals = { current: 0, days30: 0, days60: 0, days90: 0, over90: 0 };
+
+        invoices.forEach(inv => {
+            const daysOverdue = inv.dueDate
+                ? Math.floor((now - new Date(inv.dueDate)) / 86400000)
+                : 0;
+            const totalPaid = inv.paymentHistory?.reduce((s, p) => s + p.amount, 0) || 0;
+            const balance = inv.total - totalPaid;
+
+            const entry = {
+                invoiceNo: inv.invoiceNo,
+                vendor: inv.vendor?.name || 'Unknown',
+                vendorEmail: inv.vendor?.email || '',
+                total: inv.total,
+                balance,
+                dueDate: inv.dueDate,
+                daysOverdue: Math.max(0, daysOverdue),
+                status: inv.status,
+            };
+
+            if (daysOverdue <= 0) { buckets.current.push(entry); totals.current += balance; }
+            else if (daysOverdue <= 30) { buckets.days30.push(entry); totals.days30 += balance; }
+            else if (daysOverdue <= 60) { buckets.days60.push(entry); totals.days60 += balance; }
+            else if (daysOverdue <= 90) { buckets.days90.push(entry); totals.days90 += balance; }
+            else { buckets.over90.push(entry); totals.over90 += balance; }
+        });
+
+        const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
+        res.json({ success: true, data: { buckets, totals, grandTotal } });
     } catch (err) { next(err); }
 };

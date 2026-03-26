@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const grnSchema = new mongoose.Schema(
     {
-        grnNumber: { type: String },  // unique per company — no global index needed
+        grnNumber: { type: String },  // unique per company — enforced by compound index below
         po: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder', required: true },
         vendor: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
         receivedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -55,5 +55,7 @@ grnSchema.pre('save', async function (next) {
     this.grnNumber = `GRN-${year}-${String(nextNum).padStart(4, '0')}`;
     next();
 });
+
+grnSchema.index({ company: 1, grnNumber: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('GoodsReceipt', grnSchema);

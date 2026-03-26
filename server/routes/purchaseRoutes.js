@@ -2,7 +2,7 @@ import express from 'express';
 import {
     getRequisitions, getRequisition, createRequisition, submitRequisition,
     approveRequisition, rejectRequisition,
-    getPurchaseOrders, getPurchaseOrder, createPurchaseOrder, updatePOStatus,
+    getPurchaseOrders, getPurchaseOrder, createPurchaseOrder, updatePurchaseOrder, updatePOStatus,
     getGRNs, createGRN, getThreeWayMatch,
 } from '../controllers/purchaseController.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -23,6 +23,7 @@ router.put('/requisitions/:id/reject', authorize('super_admin', 'finance_manager
 router.get('/orders', getPurchaseOrders);
 router.post('/orders', authorize('super_admin', 'finance_manager', 'procurement_officer'), createPurchaseOrder);
 router.get('/orders/:id', getPurchaseOrder);
+router.put('/orders/:id', authorize('super_admin', 'finance_manager', 'procurement_officer'), updatePurchaseOrder);
 router.put('/orders/:id/status', authorize('super_admin', 'finance_manager', 'procurement_officer'), updatePOStatus);
 
 // GRN

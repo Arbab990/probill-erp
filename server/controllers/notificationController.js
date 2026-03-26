@@ -1,6 +1,9 @@
 import Notification from '../models/Notification.js';
 import Invoice from '../models/Invoice.js';
+import Customer from '../models/Customer.js';
+import Company from '../models/Company.js';
 import { notifyCompany } from '../services/notificationService.js';
+import { sendDunningEmail } from '../services/emailService.js';
 
 // GET /api/notifications
 export const getNotifications = async (req, res, next) => {
@@ -80,30 +83,89 @@ export const clearAll = async (req, res, next) => {
 export const triggerOverdueCheck = async (req, res, next) => {
     try {
         const company = req.user.company;
-        const overdue = await Invoice.find({
+
+        // Find invoices that are past due but not yet marked overdue
+        const nowOverdue = await Invoice.find({
             company,
             status: { $in: ['sent', 'partially_paid'] },
             dueDate: { $lt: new Date() },
-        }).populate('vendor', 'name').populate('customer', 'name');
+        }).populate('customer', 'name email latePaymentCount paymentTerms')
+          .populate('vendor', 'name email');
 
-        if (overdue.length > 0) {
-            // Update status to overdue
-            await Invoice.updateMany(
-                { company, status: { $in: ['sent', 'partially_paid'] }, dueDate: { $lt: new Date() } },
-                { status: 'overdue' }
-            );
+        if (!nowOverdue.length) {
+            return res.json({ success: true, message: 'No invoices to mark overdue', count: 0 });
+        }
 
-            await notifyCompany({
-                company,
-                roles: ['super_admin', 'finance_manager'],
-                title: `${overdue.length} Overdue Invoice${overdue.length > 1 ? 's' : ''}`,
-                message: `${overdue.length} invoice${overdue.length > 1 ? 's have' : ' has'} passed their due date and marked overdue.`,
-                type: 'danger',
-                module: 'invoices',
-                link: '/billing?status=overdue',
+        // Mark all as overdue
+        await Invoice.updateMany(
+            { company, status: { $in: ['sent', 'partially_paid'] }, dueDate: { $lt: new Date() } },
+            { $set: { status: 'overdue' } }
+        );
+
+        // Fetch company details for email branding
+        const companyDoc = await Company.findById(company);
+
+        // FIX #24: Send dunning email to each customer + increment latePaymentCount
+        let emailsSent = 0;
+        const customerLatePaymentUpdates = new Map(); // customerId → count to increment
+
+        for (const invoice of nowOverdue) {
+            if (invoice.type !== 'sales' || !invoice.customer) continue;
+
+            const daysOverdue = invoice.dueDate
+                ? Math.floor((Date.now() - new Date(invoice.dueDate)) / 86400000)
+                : 0;
+            const totalPaid = invoice.paymentHistory?.reduce((s, p) => s + p.amount, 0) || 0;
+            const balanceDue = invoice.total - totalPaid;
+
+            // Send dunning email to customer
+            if (invoice.customer?.email) {
+                try {
+                    await sendDunningEmail({
+                        to: invoice.customer.email,
+                        customerName: invoice.customer.name,
+                        invoiceNo: invoice.invoiceNo,
+                        balanceDue,
+                        daysOverdue,
+                        dueDate: invoice.dueDate,
+                        companyName: companyDoc?.name || 'Your Supplier',
+                    });
+                    emailsSent++;
+                } catch (emailErr) {
+                    console.error(`Dunning email failed for invoice ${invoice.invoiceNo}:`, emailErr.message);
+                }
+            }
+
+            // Track which customers need latePaymentCount incremented (once per customer)
+            const custId = invoice.customer._id?.toString();
+            if (custId && !customerLatePaymentUpdates.has(custId)) {
+                customerLatePaymentUpdates.set(custId, true);
+            }
+        }
+
+        // Increment latePaymentCount once per unique overdue customer
+        for (const customerId of customerLatePaymentUpdates.keys()) {
+            await Customer.findByIdAndUpdate(customerId, {
+                $inc: { latePaymentCount: 1 },
             });
         }
 
-        res.json({ success: true, message: `${overdue.length} invoices marked overdue`, count: overdue.length });
+        // Internal finance team notification
+        await notifyCompany({
+            company,
+            roles: ['super_admin', 'finance_manager'],
+            title: `${nowOverdue.length} Overdue Invoice${nowOverdue.length > 1 ? 's' : ''}`,
+            message: `${nowOverdue.length} invoice${nowOverdue.length > 1 ? 's have' : ' has'} passed their due date. ${emailsSent} dunning email${emailsSent !== 1 ? 's' : ''} sent to customers.`,
+            type: 'danger',
+            module: 'invoices',
+            link: '/billing?status=overdue',
+        });
+
+        res.json({
+            success: true,
+            message: `${nowOverdue.length} invoices marked overdue · ${emailsSent} dunning emails sent`,
+            count: nowOverdue.length,
+            emailsSent,
+        });
     } catch (err) { next(err); }
 };

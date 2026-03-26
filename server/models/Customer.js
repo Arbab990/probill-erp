@@ -39,4 +39,6 @@ customerSchema.pre('save', async function (next) {
     next();
 });
 
+customerSchema.index({ company: 1, customerCode: 1 }, { unique: true, sparse: true });
+
 export default mongoose.model('Customer', customerSchema);

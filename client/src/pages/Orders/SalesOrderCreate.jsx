@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { orderService } from '../../services/orderService.js';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Button from '../../components/common/Button.jsx';
@@ -46,6 +46,17 @@ const SalesOrderCreate = () => {
         const sub = (parseFloat(i.quantity) || 0) * (parseFloat(i.unitPrice) || 0);
         return s + (sub * (parseFloat(i.taxRate) || 0) / 100);
     }, 0);
+    const orderTotal = subtotal + totalTax;
+
+    // Selected customer object for credit limit display
+    const selectedCustomer = customers.find(c => c._id === form.customer);
+    const availableCredit = selectedCustomer?.creditLimit > 0
+        ? Math.max(0, selectedCustomer.creditLimit - (selectedCustomer.outstandingBalance || 0))
+        : null;
+    const willExceedLimit = selectedCustomer?.creditLimit > 0 && orderTotal > availableCredit;
+    const creditUsedPct = selectedCustomer?.creditLimit > 0
+        ? Math.min(100, ((selectedCustomer.outstandingBalance || 0) + orderTotal) / selectedCustomer.creditLimit * 100)
+        : 0;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -75,16 +86,85 @@ const SalesOrderCreate = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="input-label">Customer *</label>
-                            <select className="input-field" value={form.customer} onChange={e => setForm(p => ({ ...p, customer: e.target.value }))}>
+                            <select
+                                className="input-field"
+                                value={form.customer}
+                                onChange={e => setForm(p => ({ ...p, customer: e.target.value }))}
+                            >
                                 <option value="">Select Customer</option>
-                                {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+                                {customers.map(c => (
+                                    <option key={c._id} value={c._id}>{c.name}</option>
+                                ))}
                             </select>
                         </div>
-                        <Input label="Expected Delivery Date *" type="date" value={form.deliveryDate} onChange={e => setForm(p => ({ ...p, deliveryDate: e.target.value }))} />
+                        <Input
+                            label="Expected Delivery Date *"
+                            type="date"
+                            value={form.deliveryDate}
+                            onChange={e => setForm(p => ({ ...p, deliveryDate: e.target.value }))}
+                        />
                         <div className="md:col-span-2">
-                            <Input label="Delivery Address" value={form.deliveryAddress} onChange={e => setForm(p => ({ ...p, deliveryAddress: e.target.value }))} placeholder="Delivery location" />
+                            <Input
+                                label="Delivery Address"
+                                value={form.deliveryAddress}
+                                onChange={e => setForm(p => ({ ...p, deliveryAddress: e.target.value }))}
+                                placeholder="Delivery location"
+                            />
                         </div>
                     </div>
+
+                    {/* Credit limit indicator — shown when customer selected and has a credit limit */}
+                    {selectedCustomer && selectedCustomer.creditLimit > 0 && (
+                        <div className={`mt-4 p-3 rounded-lg border ${willExceedLimit ? 'bg-danger/10 border-danger/30' : 'bg-dark-bg border-dark-border'}`}>
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                    {willExceedLimit && <AlertTriangle size={13} className="text-danger flex-shrink-0" />}
+                                    <span className="text-xs font-semibold text-slate-300">
+                                        {selectedCustomer.name} — Credit Limit
+                                    </span>
+                                </div>
+                                <span className={`text-xs font-mono font-bold ${willExceedLimit ? 'text-danger' : 'text-slate-300'}`}>
+                                    {formatCurrency(selectedCustomer.creditLimit)}
+                                </span>
+                            </div>
+
+                            {/* Credit bar */}
+                            <div className="w-full h-1.5 bg-dark-hover rounded-full overflow-hidden mb-2">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-300 ${
+                                        willExceedLimit ? 'bg-danger' :
+                                        creditUsedPct > 80 ? 'bg-warning' : 'bg-success'
+                                    }`}
+                                    style={{ width: `${Math.min(100, creditUsedPct)}%` }}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2 text-xs text-slate-500">
+                                <div>
+                                    <p className="mb-0.5">Currently Used</p>
+                                    <p className="font-mono text-warning">{formatCurrency(selectedCustomer.outstandingBalance || 0)}</p>
+                                </div>
+                                <div>
+                                    <p className="mb-0.5">This Order</p>
+                                    <p className={`font-mono ${willExceedLimit ? 'text-danger' : 'text-slate-300'}`}>
+                                        {formatCurrency(orderTotal)}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="mb-0.5">Available</p>
+                                    <p className={`font-mono font-bold ${willExceedLimit ? 'text-danger' : 'text-success'}`}>
+                                        {formatCurrency(availableCredit)}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {willExceedLimit && (
+                                <p className="text-xs text-danger mt-2 font-body">
+                                    This order will exceed the credit limit by {formatCurrency(orderTotal - availableCredit)}. The server will block submission.
+                                </p>
+                            )}
+                        </div>
+                    )}
                 </Card>
 
                 <Card>
@@ -106,30 +186,65 @@ const SalesOrderCreate = () => {
                                 {form.items.map((item, idx) => (
                                     <tr key={idx} className="border-b border-dark-border/30">
                                         <td className="py-2 pr-3">
-                                            <input value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Product or service" className="input-field text-xs py-1.5" required />
+                                            <input
+                                                value={item.description}
+                                                onChange={e => updateItem(idx, 'description', e.target.value)}
+                                                placeholder="Product or service"
+                                                className="input-field text-xs py-1.5"
+                                                required
+                                            />
                                         </td>
                                         <td className="py-2 pr-3 w-20">
-                                            <input type="number" min="1" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} className="input-field text-xs py-1.5 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden" />
+                                            <input
+                                                type="number" min="1"
+                                                value={item.quantity}
+                                                onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                                                className="input-field text-xs py-1.5 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+                                            />
                                         </td>
                                         <td className="py-2 pr-3 w-20">
-                                            <select value={item.unit} onChange={e => updateItem(idx, 'unit', e.target.value)} className="input-field text-xs py-1.5">
-                                                {['pcs', 'kg', 'ltr', 'box', 'set', 'hr', 'days', 'month'].map(u => <option key={u}>{u}</option>)}
+                                            <select
+                                                value={item.unit}
+                                                onChange={e => updateItem(idx, 'unit', e.target.value)}
+                                                className="input-field text-xs py-1.5"
+                                            >
+                                                {['pcs', 'kg', 'ltr', 'box', 'set', 'hr', 'days', 'month'].map(u => (
+                                                    <option key={u}>{u}</option>
+                                                ))}
                                             </select>
                                         </td>
                                         <td className="py-2 pr-3 w-28">
-                                            <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} className="input-field text-xs py-1.5 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden" />
+                                            <input
+                                                type="number" min="0" step="0.01"
+                                                value={item.unitPrice}
+                                                onChange={e => updateItem(idx, 'unitPrice', e.target.value)}
+                                                className="input-field text-xs py-1.5 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+                                            />
                                         </td>
                                         <td className="py-2 pr-3 w-20">
-                                            <select value={item.taxRate} onChange={e => updateItem(idx, 'taxRate', e.target.value)} className="input-field text-xs py-1.5">
-                                                {[0, 5, 12, 18, 28].map(r => <option key={r} value={r}>{r}%</option>)}
+                                            <select
+                                                value={item.taxRate}
+                                                onChange={e => updateItem(idx, 'taxRate', e.target.value)}
+                                                className="input-field text-xs py-1.5"
+                                            >
+                                                {[0, 5, 12, 18, 28].map(r => (
+                                                    <option key={r} value={r}>{r}%</option>
+                                                ))}
                                             </select>
                                         </td>
                                         <td className="py-2 pr-3 w-28 font-mono text-sm text-slate-200">
-                                            {formatCurrency(((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)) * (1 + (parseFloat(item.taxRate) || 0) / 100))}
+                                            {formatCurrency(
+                                                ((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)) *
+                                                (1 + (parseFloat(item.taxRate) || 0) / 100)
+                                            )}
                                         </td>
                                         <td className="py-2 w-8">
                                             {form.items.length > 1 && (
-                                                <button type="button" onClick={() => removeItem(idx)} className="p-1 rounded text-slate-500 hover:text-danger hover:bg-danger/10">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeItem(idx)}
+                                                    className="p-1 rounded text-slate-500 hover:text-danger hover:bg-danger/10"
+                                                >
                                                     <Trash2 size={13} />
                                                 </button>
                                             )}
@@ -142,21 +257,43 @@ const SalesOrderCreate = () => {
 
                     <div className="flex justify-end mt-4 pt-4 border-t border-dark-border">
                         <div className="w-56 space-y-1.5">
-                            <div className="flex justify-between text-sm text-slate-400"><span>Subtotal</span><span className="font-mono">{formatCurrency(subtotal)}</span></div>
-                            <div className="flex justify-between text-sm text-slate-400"><span>Tax</span><span className="font-mono">{formatCurrency(totalTax)}</span></div>
-                            <div className="flex justify-between font-bold text-slate-100 border-t border-dark-border pt-2"><span>Total</span><span className="font-mono text-success">{formatCurrency(subtotal + totalTax)}</span></div>
+                            <div className="flex justify-between text-sm text-slate-400">
+                                <span>Subtotal</span><span className="font-mono">{formatCurrency(subtotal)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-slate-400">
+                                <span>Tax</span><span className="font-mono">{formatCurrency(totalTax)}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-slate-100 border-t border-dark-border pt-2">
+                                <span>Total</span>
+                                <span className={`font-mono ${willExceedLimit ? 'text-danger' : 'text-success'}`}>
+                                    {formatCurrency(orderTotal)}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </Card>
 
                 <Card>
                     <h3 className="font-display font-semibold text-slate-100 mb-3">Notes</h3>
-                    <textarea className="input-field" rows={3} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Special instructions, delivery requirements..." />
+                    <textarea
+                        className="input-field"
+                        rows={3}
+                        value={form.notes}
+                        onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+                        placeholder="Special instructions, delivery requirements..."
+                    />
                 </Card>
 
                 <div className="flex gap-3 justify-end">
                     <Button type="button" variant="secondary" onClick={() => navigate('/orders/sales')}>Cancel</Button>
-                    <Button type="submit" loading={loading}>Create Sales Order</Button>
+                    <Button
+                        type="submit"
+                        loading={loading}
+                        variant={willExceedLimit ? 'danger' : 'primary'}
+                        disabled={willExceedLimit}
+                    >
+                        {willExceedLimit ? 'Credit Limit Exceeded' : 'Create Sales Order'}
+                    </Button>
                 </div>
             </form>
         </div>

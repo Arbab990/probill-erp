@@ -49,6 +49,7 @@ export const NAV_SECTIONS = [
             { label: 'Invoices', path: '/billing', icon: 'FileText', roles: ['super_admin', 'finance_manager', 'procurement_officer', 'sales_executive', 'auditor'] },
             { label: 'Payment Runs', path: '/payments', icon: 'CreditCard', roles: ['super_admin', 'finance_manager', 'auditor'] },
             { label: 'Record to Report', path: '/finance', icon: 'BookOpen', roles: ['super_admin', 'finance_manager', 'auditor'] },
+            { label: 'AP Aging', path: '/reports/ap-aging', icon: 'TrendingDown', roles: ['super_admin', 'finance_manager', 'auditor'] },
         ]
     },
     {
@@ -70,6 +71,7 @@ export const NAV_SECTIONS = [
             { label: 'Chart of Accounts', path: '/gl/accounts', icon: 'List', roles: ['super_admin', 'finance_manager', 'auditor'] },
             { label: 'Journal Entries', path: '/gl/journal', icon: 'FileText', roles: ['super_admin', 'finance_manager', 'auditor'] },
             { label: 'Financial Reports', path: '/gl/reports', icon: 'BarChart2', roles: ['super_admin', 'finance_manager', 'auditor'] },
+            { label: 'Fiscal Periods', path: '/gl/fiscal-periods', icon: 'Lock', roles: ['super_admin', 'finance_manager'] },
         ]
     },
     {

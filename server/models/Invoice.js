@@ -11,7 +11,7 @@ const lineItemSchema = new mongoose.Schema({
 
 const invoiceSchema = new mongoose.Schema(
     {
-        invoiceNo: { type: String },  // unique per company — no global index needed
+        invoiceNo: { type: String },  // unique per company — enforced by compound index below
         type: { type: String, enum: ['sales', 'purchase'], required: true },
         vendor: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor' },
         customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
@@ -60,5 +60,7 @@ invoiceSchema.pre('save', async function (next) {
     this.invoiceNo = `INV-${year}-${String(nextNum).padStart(5, '0')}`;
     next();
 });
+
+invoiceSchema.index({ company: 1, invoiceNo: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('Invoice', invoiceSchema);

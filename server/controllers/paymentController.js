@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import PaymentRun from '../models/PaymentRun.js';
 import Invoice from '../models/Invoice.js';
 import { createObjectCsvStringifier } from 'csv-writer';
@@ -304,46 +305,51 @@ export const executePaymentRun = async (req, res, next) => {
         let processedCount = 0;
         let failedCount = 0;
 
-        for (const entry of run.entries) {
-            // Skip already processed (idempotency — safe to re-run after crash)
-            if (entry.status === 'processed') { processedCount++; continue; }
-            if (entry.blocked || entry.status === 'blocked') { entry.status = 'skipped'; continue; }
+        // ── Mongoose session for atomicity — server crash = full rollback ──
+        const session = await mongoose.startSession();
 
-            try {
-                const invoice = await Invoice.findById(entry.invoice._id || entry.invoice);
-                if (!invoice) throw new Error('Invoice not found');
+        try {
+            await session.withTransaction(async () => {
+                for (const entry of run.entries) {
+                    // Idempotency — skip already processed (safe after crash recovery)
+                    if (entry.status === 'processed') { processedCount++; return; }
+                    if (entry.blocked || entry.status === 'blocked') { entry.status = 'skipped'; return; }
 
-                // ── Record payment on invoice ──
-                invoice.paymentHistory.push({
-                    amount: entry.amount,
-                    method: run.paymentMethod,
-                    reference: entry.reference,
-                });
-                const totalPaid = invoice.paymentHistory.reduce((s, p) => s + p.amount, 0);
-                invoice.status = totalPaid >= invoice.total ? 'paid' : 'partially_paid';
-                await invoice.save();
+                    try {
+                        const invoice = await Invoice.findById(entry.invoice._id || entry.invoice).session(session);
+                        if (!invoice) throw new Error('Invoice not found');
 
-                // ── GL clearing stub ──
-                // When Phase 7 (General Ledger) is built, replace this with a real
-                // JournalEntry: Dr Accounts Payable / Cr Bank Account
-                // entry.glEntryId = createdJournalEntry._id;
-                entry.glPosted = false; // will be true after Phase 7
-                entry.clearingRef = `CLR-${run.runNumber}-${String(processedCount + 1).padStart(3, '0')}`;
-                entry.status = 'processed';
-                processedCount++;
-            } catch (err) {
-                entry.status = 'failed';
-                entry.failureReason = err.message;
-                failedCount++;
-            }
+                        // Record payment on invoice (inside transaction)
+                        invoice.paymentHistory.push({
+                            amount: entry.amount,
+                            method: run.paymentMethod,
+                            reference: entry.reference,
+                        });
+                        const totalPaid = invoice.paymentHistory.reduce((s, p) => s + p.amount, 0);
+                        invoice.status = totalPaid >= invoice.total ? 'paid' : 'partially_paid';
+                        await invoice.save({ session });
+
+                        entry.glPosted = false;
+                        entry.clearingRef = `CLR-${run.runNumber}-${String(processedCount + 1).padStart(3, '0')}`;
+                        entry.status = 'processed';
+                        processedCount++;
+                    } catch (entryErr) {
+                        entry.status = 'failed';
+                        entry.failureReason = entryErr.message;
+                        failedCount++;
+                    }
+                }
+
+                run.status = failedCount > 0 ? 'partial' : 'completed';
+                run.executedBy = req.user._id;
+                run.executedAt = new Date();
+                audit(run, req.user._id, 'EXECUTION_COMPLETED',
+                    `${processedCount} processed · ${failedCount} failed`);
+                await run.save({ session });
+            });
+        } finally {
+            session.endSession();
         }
-
-        run.status = failedCount > 0 && processedCount === 0 ? 'partial' : failedCount > 0 ? 'partial' : 'completed';
-        run.executedBy = req.user._id;
-        run.executedAt = new Date();
-        audit(run, req.user._id, 'EXECUTION_COMPLETED',
-            `${processedCount} processed · ${failedCount} failed`);
-        await run.save();
 
         // ── Phase 7 GL Integration — post clearing entry ──
         try {

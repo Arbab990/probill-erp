@@ -48,4 +48,6 @@ vendorSchema.pre('save', async function (next) {
     this.vendorCode = `VND-${String(nextNum).padStart(4, '0')}`;
     next();
 });
+vendorSchema.index({ company: 1, vendorCode: 1 }, { unique: true, sparse: true });
+
 export default mongoose.model('Vendor', vendorSchema);

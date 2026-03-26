@@ -63,10 +63,37 @@ export const updateCustomer = async (req, res, next) => {
 };
 
 // DELETE /api/orders/customers/:id
+// FIXED: Referential integrity check — block delete if active SOs or invoices exist
 export const deleteCustomer = async (req, res, next) => {
     try {
-        const customer = await Customer.findOneAndDelete({ _id: req.params.id, company: req.user.company });
+        const customer = await Customer.findOne({ _id: req.params.id, company: req.user.company });
         if (!customer) return res.status(404).json({ success: false, error: 'Customer not found' });
+
+        // Block deletion if any Sales Orders reference this customer
+        const linkedSOCount = await SalesOrder.countDocuments({
+            customer: customer._id,
+            status: { $nin: ['cancelled'] },
+        });
+        if (linkedSOCount > 0) {
+            return res.status(409).json({
+                success: false,
+                error: `Cannot delete customer "${customer.name}" — they have ${linkedSOCount} active sales order(s). Cancel all orders first, or mark the customer as inactive instead.`,
+            });
+        }
+
+        // Block deletion if any unpaid invoices reference this customer
+        const linkedInvoiceCount = await Invoice.countDocuments({
+            customer: customer._id,
+            status: { $nin: ['paid', 'cancelled'] },
+        });
+        if (linkedInvoiceCount > 0) {
+            return res.status(409).json({
+                success: false,
+                error: `Cannot delete customer "${customer.name}" — they have ${linkedInvoiceCount} outstanding invoice(s). Settle all invoices first.`,
+            });
+        }
+
+        await customer.deleteOne();
         await logAudit({ action: 'CUSTOMER_DELETED', module: 'orders', description: `Customer "${customer.name}" (${customer.customerCode}) deleted`, performedBy: req.user._id, performedByName: req.user.name, targetId: customer._id, targetRef: 'Customer', severity: 'warning', company: req.user.company, req });
         res.json({ success: true, message: 'Customer deleted' });
     } catch (err) { next(err); }
@@ -112,9 +139,14 @@ export const getSalesOrder = async (req, res, next) => {
 };
 
 // POST /api/orders/sales
+// FIXED: Credit limit enforcement before allowing order creation
 export const createSalesOrder = async (req, res, next) => {
     try {
         const { items = [], ...rest } = req.body;
+
+        if (!rest.customer) {
+            return res.status(400).json({ success: false, error: 'Customer is required for a sales order' });
+        }
 
         const calculatedItems = items.map(item => {
             const subtotal = (item.quantity || 0) * (item.unitPrice || 0);
@@ -124,18 +156,38 @@ export const createSalesOrder = async (req, res, next) => {
 
         const subtotal = calculatedItems.reduce((s, i) => s + ((i.quantity || 0) * (i.unitPrice || 0)), 0);
         const totalTax = calculatedItems.reduce((s, i) => s + (i.taxAmount || 0), 0);
+        const orderTotal = subtotal + totalTax;
+
+        // ── Credit limit check ───────────────────────────────────────────────
+        const customer = await Customer.findOne({ _id: rest.customer, company: req.user.company });
+        if (!customer) return res.status(404).json({ success: false, error: 'Customer not found' });
+
+        if (customer.status === 'blocked') {
+            return res.status(400).json({ success: false, error: `Customer "${customer.name}" is blocked and cannot receive new orders.` });
+        }
+
+        if (customer.creditLimit > 0) {
+            const projectedBalance = (customer.outstandingBalance || 0) + orderTotal;
+            if (projectedBalance > customer.creditLimit) {
+                return res.status(400).json({
+                    success: false,
+                    error: `Credit limit exceeded for "${customer.name}". Limit: ₹${customer.creditLimit.toLocaleString('en-IN')}, Currently used: ₹${(customer.outstandingBalance || 0).toLocaleString('en-IN')}, This order: ₹${orderTotal.toLocaleString('en-IN')}. Available credit: ₹${Math.max(0, customer.creditLimit - (customer.outstandingBalance || 0)).toLocaleString('en-IN')}.`,
+                });
+            }
+        }
+        // ────────────────────────────────────────────────────────────────────
 
         const order = await SalesOrder.create({
             ...rest, items: calculatedItems,
             subtotal, totalTax,
-            totalAmount: subtotal + totalTax,
+            totalAmount: orderTotal,
             company: req.user.company,
             createdBy: req.user._id,
         });
 
-        // Update customer outstanding balance
+        // Increment customer outstanding balance
         await Customer.findByIdAndUpdate(rest.customer, {
-            $inc: { outstandingBalance: subtotal + totalTax },
+            $inc: { outstandingBalance: orderTotal },
         });
 
         await logAudit({ action: 'SO_CREATED', module: 'orders', description: `Sales Order ${order.soNumber} created — ₹${order.totalAmount}`, performedBy: req.user._id, performedByName: req.user.name, targetId: order._id, targetRef: 'SalesOrder', severity: 'info', company: req.user.company, req });
@@ -145,20 +197,64 @@ export const createSalesOrder = async (req, res, next) => {
 };
 
 // PUT /api/orders/sales/:id/status
+// FIXED: Reverse outstandingBalance when SO is cancelled
 export const updateSOStatus = async (req, res, next) => {
     try {
         const { status } = req.body;
         const allowed = ['draft', 'confirmed', 'processing', 'shipped', 'delivered', 'invoiced', 'paid', 'cancelled'];
         if (!allowed.includes(status)) return res.status(400).json({ success: false, error: 'Invalid status' });
 
-        const order = await SalesOrder.findOneAndUpdate(
-            { _id: req.params.id, company: req.user.company },
-            { status },
-            { new: true }
-        ).populate('customer', 'name');
-
+        // Fetch order first so we can reverse balance on cancellation
+        const order = await SalesOrder.findOne({ _id: req.params.id, company: req.user.company });
         if (!order) return res.status(404).json({ success: false, error: 'Sales order not found' });
-        await logAudit({ action: 'SO_STATUS_CHANGED', module: 'orders', description: `Sales Order ${order.soNumber} status changed to "${status}"`, performedBy: req.user._id, performedByName: req.user.name, targetId: order._id, targetRef: 'SalesOrder', severity: status === 'cancelled' ? 'warning' : 'info', company: req.user.company, req });
+
+        // Prevent re-cancelling already cancelled orders
+        if (order.status === 'cancelled' && status === 'cancelled') {
+            return res.status(400).json({ success: false, error: 'Order is already cancelled' });
+        }
+
+        // Prevent status change on paid orders (except viewing)
+        if (order.status === 'paid' && status !== 'paid') {
+            return res.status(400).json({ success: false, error: 'Cannot change status of a paid order' });
+        }
+
+        // ── Reverse outstandingBalance when cancelling ────────────────────
+        if (status === 'cancelled' && order.status !== 'cancelled') {
+            // Only reverse if not yet invoiced — once invoiced, the invoice tracks the balance
+            if (!order.invoiceLinked) {
+                await Customer.findByIdAndUpdate(order.customer, {
+                    $inc: { outstandingBalance: -order.totalAmount },
+                });
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────
+
+        order.status = status;
+        await order.save();
+
+        await logAudit({
+            action: 'SO_STATUS_CHANGED',
+            module: 'orders',
+            description: `Sales Order ${order.soNumber} status changed to "${status}"${status === 'cancelled' && !order.invoiceLinked ? ' — outstanding balance reversed' : ''}`,
+            performedBy: req.user._id,
+            performedByName: req.user.name,
+            targetId: order._id,
+            targetRef: 'SalesOrder',
+            severity: status === 'cancelled' ? 'warning' : 'info',
+            company: req.user.company,
+            req,
+        });
+
+        await notifyCompany({
+            company: req.user.company,
+            title: `Sales Order ${status === 'cancelled' ? 'Cancelled' : 'Updated'}`,
+            message: `${order.soNumber} ${status === 'cancelled' ? 'cancelled' : `updated to ${status}`} by ${req.user.name}`,
+            type: status === 'cancelled' ? 'danger' : 'info',
+            module: 'orders',
+            link: `/orders/sales/${order._id}`,
+            sourceRef: order.soNumber,
+        });
+
         res.json({ success: true, message: `Order status updated to ${status}`, data: order });
     } catch (err) { next(err); }
 };
@@ -171,6 +267,9 @@ export const createInvoiceFromSO = async (req, res, next) => {
             .populate('customer');
         if (!order) return res.status(404).json({ success: false, error: 'Sales order not found' });
         if (order.invoiceLinked) return res.status(400).json({ success: false, error: 'Invoice already created for this order' });
+        if (order.status !== 'delivered') {
+            return res.status(400).json({ success: false, error: 'Only delivered orders can be invoiced' });
+        }
 
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + (order.customer?.paymentTerms || 30));
@@ -250,7 +349,6 @@ export const getARAgingReport = async (req, res, next) => {
         });
 
         const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
-
         res.json({ success: true, data: { buckets, totals, grandTotal } });
     } catch (err) { next(err); }
 };

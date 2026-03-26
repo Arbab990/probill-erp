@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Download, Send, CheckCircle, XCircle, DollarSign } from 'lucide-react';
+import { Download, Send, CheckCircle, XCircle, DollarSign, BookOpen } from 'lucide-react';
 import { invoiceService } from '../../services/invoiceService.js';
+import { glService } from '../../services/glService.js';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Badge from '../../components/common/Badge.jsx';
 import Button from '../../components/common/Button.jsx';
@@ -23,6 +24,14 @@ const InvoiceDetail = () => {
     const [paymentModal, setPaymentModal] = useState(false);
     const [payment, setPayment] = useState({ amount: '', method: 'bank_transfer', reference: '' });
     const [recordingPayment, setRecordingPayment] = useState(false);
+    const [glEntries, setGlEntries] = useState([]);
+
+    // Load any auto-posted GL entries linked to this invoice
+    const fetchGLEntries = () => {
+        glService.getJournalEntries({ sourceId: id, sourceType: 'invoice', limit: 5 })
+            .then(res => setGlEntries(res.data.data || []))
+            .catch(() => {}); // Non-critical, silently ignore
+    };
 
     const fetchInvoice = () => {
         invoiceService.getById(id)
@@ -31,7 +40,7 @@ const InvoiceDetail = () => {
             .finally(() => setLoading(false));
     };
 
-    useEffect(() => { fetchInvoice(); }, [id]);
+    useEffect(() => { fetchInvoice(); fetchGLEntries(); }, [id]);
 
     const handleSend = async () => {
         setSending(true);
@@ -172,6 +181,32 @@ const InvoiceDetail = () => {
                             <div className="border-t border-dark-border pt-2 flex justify-between"><span className="text-slate-300 font-medium">Balance Due</span><span className="font-mono font-bold text-primary-light">{formatCurrency(balance)}</span></div>
                         </div>
                     </Card>
+
+                    {/* GL Journal Entries — auto-posted when invoice is sent/paid */}
+                    {glEntries.length > 0 && (
+                        <Card>
+                            <div className="flex items-center gap-2 mb-3">
+                                <BookOpen size={14} className="text-primary-light" />
+                                <h3 className="font-display font-semibold text-slate-100">GL Journal Entries</h3>
+                            </div>
+                            <div className="space-y-2">
+                                {glEntries.map((entry, i) => (
+                                    <div key={i} className="flex items-center justify-between p-2.5 bg-dark-bg rounded-lg border border-dark-border/50">
+                                        <div>
+                                            <p className="font-mono text-xs text-primary-light">{entry.entryNo}</p>
+                                            <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[160px]">{entry.narration}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => navigate(`/gl/journal/${entry._id}`)}
+                                            className="text-xs text-slate-400 hover:text-primary-light transition-colors flex-shrink-0 ml-2"
+                                        >
+                                            View →
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </Card>
+                    )}
 
                     {invoice.paymentHistory?.length > 0 && (
                         <Card>

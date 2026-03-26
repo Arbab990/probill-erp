@@ -13,6 +13,7 @@ export const purchaseService = {
     getPurchaseOrders: (params) => api.get('/purchase/orders', { params }),
     getPurchaseOrder: (id) => api.get(`/purchase/orders/${id}`),
     createPurchaseOrder: (data) => api.post('/purchase/orders', data),
+    updatePurchaseOrder: (id, data) => api.put(`/purchase/orders/${id}`, data),
     updatePOStatus: (id, status) => api.put(`/purchase/orders/${id}/status`, { status }),
 
     // GRN

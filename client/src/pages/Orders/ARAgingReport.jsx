@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
-import { AlertTriangle, TrendingUp } from 'lucide-react';
+import { AlertTriangle, TrendingUp, Sparkles, X } from 'lucide-react';
 import { orderService } from '../../services/orderService.js';
+import { aiService } from '../../services/aiService.js';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Card from '../../components/common/Card.jsx';
 import Badge from '../../components/common/Badge.jsx';
+import Button from '../../components/common/Button.jsx';
 import { PageLoader } from '../../components/common/Loader.jsx';
 import { formatCurrency, formatDate } from '../../utils/formatters.js';
 import toast from 'react-hot-toast';
@@ -16,10 +18,21 @@ const BUCKETS = [
     { key: 'over90', label: '90+ Days', subLabel: 'Critical', color: 'text-danger', bg: 'bg-danger/20', border: 'border-danger/30' },
 ];
 
+const LIKELIHOOD_STYLES = {
+    high: { bg: 'bg-danger/10 border-danger/30', text: 'text-danger', badge: 'badge-danger' },
+    medium: { bg: 'bg-warning/10 border-warning/30', text: 'text-warning', badge: 'badge-warning' },
+    low: { bg: 'bg-success/10 border-success/30', text: 'text-success', badge: 'badge-success' },
+};
+
 const ARAgingReport = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [activeBucket, setActiveBucket] = useState('current');
+
+    // AI late payer prediction state
+    const [predicting, setPredicting] = useState(false);
+    const [predictions, setPredictions] = useState(null);
+    const [showPredictions, setShowPredictions] = useState(false);
 
     useEffect(() => {
         orderService.getARAgingReport()
@@ -27,6 +40,22 @@ const ARAgingReport = () => {
             .catch(() => toast.error('Failed to load AR aging report'))
             .finally(() => setLoading(false));
     }, []);
+
+    const handlePredictLatePayers = async () => {
+        setPredicting(true);
+        setShowPredictions(true);
+        try {
+            const res = await aiService.predictLatePayers();
+            setPredictions(res.data.data);
+            if (!res.data.data.fallback) {
+                const high = res.data.data.predictions?.filter(p => p.likelihood === 'high').length || 0;
+                toast.success(high > 0 ? `${high} customer${high > 1 ? 's' : ''} flagged as high risk` : 'AI prediction complete');
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'AI prediction failed');
+            setShowPredictions(false);
+        } finally { setPredicting(false); }
+    };
 
     if (loading) return <div className="page-container"><PageLoader /></div>;
 
@@ -38,7 +67,66 @@ const ARAgingReport = () => {
                 title="AR Aging Report"
                 subtitle="Outstanding receivables by age bucket"
                 breadcrumbs={[{ label: 'Order to Cash', href: '/orders' }, { label: 'AR Aging' }]}
+                actions={
+                    <Button
+                        variant="secondary"
+                        icon={Sparkles}
+                        loading={predicting}
+                        onClick={handlePredictLatePayers}
+                    >
+                        Predict Late Payers
+                    </Button>
+                }
             />
+
+            {/* AI Late Payer Predictions Panel */}
+            {showPredictions && predictions && (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2">
+                            <Sparkles size={16} className="text-primary-light" />
+                            <div>
+                                <p className="text-sm font-semibold text-slate-100">AI Late Payer Predictions</p>
+                                {predictions.summary && (
+                                    <p className="text-xs text-slate-400 font-body mt-0.5">{predictions.summary}</p>
+                                )}
+                            </div>
+                        </div>
+                        <button onClick={() => setShowPredictions(false)} className="p-1 rounded text-slate-500 hover:text-slate-200">
+                            <X size={14} />
+                        </button>
+                    </div>
+
+                    {predictions.fallback && (
+                        <p className="text-sm text-slate-500 font-body">AI prediction unavailable — add a Gemini API key to your server .env to enable this feature.</p>
+                    )}
+
+                    {!predictions.fallback && predictions.predictions?.length === 0 && (
+                        <p className="text-sm text-slate-400 font-body">No active customers with outstanding balances to analyze.</p>
+                    )}
+
+                    {!predictions.fallback && predictions.predictions?.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {predictions.predictions
+                                .sort((a, b) => ({ high: 0, medium: 1, low: 2 }[a.likelihood] - { high: 0, medium: 1, low: 2 }[b.likelihood]))
+                                .map((p, i) => {
+                                    const s = LIKELIHOOD_STYLES[p.likelihood] || LIKELIHOOD_STYLES.low;
+                                    return (
+                                        <div key={i} className={`p-3 rounded-lg border ${s.bg}`}>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <p className="text-sm font-semibold text-slate-200 truncate">{p.customerName}</p>
+                                                <span className={`badge ${s.badge} ml-2 flex-shrink-0`}>{p.likelihood}</span>
+                                            </div>
+                                            {p.reason && (
+                                                <p className="text-xs text-slate-400 font-body leading-relaxed">{p.reason}</p>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Summary Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -56,7 +144,7 @@ const ARAgingReport = () => {
             </div>
 
             {/* Grand total */}
-            <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-dark-card">
+            <Card className="border-primary/20">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-center">
@@ -67,7 +155,7 @@ const ARAgingReport = () => {
                             <p className="font-mono font-bold text-2xl text-primary-light">{formatCurrency(grandTotal)}</p>
                         </div>
                     </div>
-                    {(totals.days90 + totals.over90) > 0 && (
+                    {((totals.days90 || 0) + (totals.over90 || 0)) > 0 && (
                         <div className="flex items-center gap-2 px-3 py-2 bg-danger/10 border border-danger/20 rounded-lg">
                             <AlertTriangle size={16} className="text-danger" />
                             <div>
@@ -85,9 +173,9 @@ const ARAgingReport = () => {
                 const rows = buckets[activeBucket] || [];
                 return (
                     <Card className="p-0 overflow-hidden">
-                        <div className={`px-5 py-4 border-b border-dark-border flex items-center justify-between`}>
+                        <div className="px-5 py-4 border-b border-dark-border flex items-center justify-between">
                             <div>
-                                <h3 className={`font-display font-bold text-slate-100`}>{bucket?.label} Invoices</h3>
+                                <h3 className="font-display font-bold text-slate-100">{bucket?.label} Invoices</h3>
                                 <p className="text-xs text-slate-500 font-body mt-0.5">{bucket?.subLabel} · {rows.length} invoices · {formatCurrency(totals[activeBucket] || 0)}</p>
                             </div>
                         </div>

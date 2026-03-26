@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckSquare, Square } from 'lucide-react';
+import { AlertTriangle, CheckSquare, Square, Sparkles } from 'lucide-react';
 import { paymentService } from '../../services/paymentService.js';
+import { aiService } from '../../services/aiService.js';
 import PageHeader from '../../components/layout/PageHeader.jsx';
 import Button from '../../components/common/Button.jsx';
 import Input from '../../components/common/Input.jsx';
@@ -10,7 +11,6 @@ import Badge from '../../components/common/Badge.jsx';
 import { PageLoader } from '../../components/common/Loader.jsx';
 import { formatCurrency, formatDate } from '../../utils/formatters.js';
 import toast from 'react-hot-toast';
-import { Sparkles } from 'lucide-react';
 
 const PaymentRunCreate = () => {
     const navigate = useNavigate();
@@ -26,6 +26,21 @@ const PaymentRunCreate = () => {
         scheduledDate: new Date().toISOString().split('T')[0],
         notes: '',
     });
+
+    // AI payment timing state
+    const [gettingAdvice, setGettingAdvice] = useState(false);
+    const [aiAdvice, setAiAdvice] = useState(null);
+
+    const handlePaymentTimingAI = async () => {
+        setGettingAdvice(true);
+        try {
+            const res = await aiService.paymentTiming(0);
+            setAiAdvice(res.data.data);
+            if (!res.data.data.fallback) toast.success('AI payment advice ready');
+        } catch (err) {
+            toast.error(err.response?.data?.error || 'AI advice failed');
+        } finally { setGettingAdvice(false); }
+    };
 
     useEffect(() => {
         setFetching(true);
@@ -214,6 +229,41 @@ const PaymentRunCreate = () => {
                                 <span className="font-bold text-primary-light">{selected.size} invoices</span> selected for payment
                             </p>
                             <p className="font-mono font-bold text-primary-light">{formatCurrency(totalSelected)}</p>
+                        </div>
+                    )}
+                </Card>
+
+                {/* AI Payment Timing Advice */}
+                <Card className={aiAdvice && !aiAdvice.fallback ? 'border-primary/30 bg-primary/5' : ''}>
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <Sparkles size={15} className="text-primary-light" />
+                            <h3 className="font-display font-semibold text-slate-100">AI Payment Timing</h3>
+                        </div>
+                        <Button type="button" variant="secondary" size="sm" icon={Sparkles} loading={gettingAdvice} onClick={handlePaymentTimingAI}>
+                            {aiAdvice ? 'Refresh Advice' : 'Get AI Advice'}
+                        </Button>
+                    </div>
+
+                    {!aiAdvice && (
+                        <p className="text-xs text-slate-500 font-body">Click "Get AI Advice" to analyze your pending invoices and get a recommended payment schedule to optimize cash flow.</p>
+                    )}
+
+                    {aiAdvice?.fallback && (
+                        <p className="text-xs text-slate-500 font-body">AI advice unavailable — add a Gemini API key to your server .env to enable this feature.</p>
+                    )}
+
+                    {aiAdvice && !aiAdvice.fallback && (
+                        <div className="space-y-2">
+                            <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
+                                <p className="text-sm text-slate-300 font-body leading-relaxed">{aiAdvice.recommendation}</p>
+                            </div>
+                            {aiAdvice.estimatedSavings && aiAdvice.estimatedSavings !== '₹0' && (
+                                <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-lg">
+                                    <span className="text-xs text-slate-400 font-body">Estimated savings:</span>
+                                    <span className="text-sm font-semibold text-success font-mono">{aiAdvice.estimatedSavings}</span>
+                                </div>
+                            )}
                         </div>
                     )}
                 </Card>

@@ -1,5 +1,6 @@
 import ChartOfAccounts from '../models/ChartOfAccounts.js';
 import JournalEntry from '../models/JournalEntry.js';
+import { checkPeriodOpen } from './fiscalPeriodController.js';
 import mongoose from 'mongoose';
 import { logAudit } from '../services/auditService.js';
 import { notifyCompany } from '../services/notificationService.js';
@@ -92,10 +93,11 @@ export const updateAccount = async (req, res, next) => {
 // GET /api/gl/journal
 export const getJournalEntries = async (req, res, next) => {
     try {
-        const { page = 1, limit = 20, status = '', sourceType = '', search = '' } = req.query;
+        const { page = 1, limit = 20, status = '', sourceType = '', search = '', sourceId = '' } = req.query;
         const query = { company: req.user.company };
         if (status) query.status = status;
         if (sourceType) query.sourceType = sourceType;
+        if (sourceId) query.sourceId = sourceId; // filter by linked document (invoice, SO, etc.)
         if (search) query.$or = [
             { entryNo: { $regex: search, $options: 'i' } },
             { narration: { $regex: search, $options: 'i' } },

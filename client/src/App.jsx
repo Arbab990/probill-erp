@@ -3,6 +3,8 @@ import ProtectedRoute from './guards/ProtectedRoute.jsx';
 import Layout from './components/layout/Layout.jsx';
 import Login from './pages/Auth/Login.jsx';
 import Register from './pages/Auth/Register.jsx';
+import ForgotPassword from './pages/Auth/ForgotPassword.jsx';
+import ResetPassword from './pages/Auth/ResetPassword.jsx';
 import Dashboard from './pages/Dashboard/Dashboard.jsx';
 import VendorList from './pages/Vendors/VendorList.jsx';
 import VendorForm from './pages/Vendors/VendorForm.jsx';
@@ -30,6 +32,7 @@ import PaymentRunList from './pages/Payments/PaymentRunList.jsx';
 import PaymentRunCreate from './pages/Payments/PaymentRunCreate.jsx';
 import PaymentRunDetail from './pages/Payments/PaymentRunDetail.jsx';
 import GLHub from './pages/GL/GLHub.jsx';
+import FiscalPeriods from './pages/GL/FiscalPeriods.jsx';
 import ChartOfAccounts from './pages/GL/ChartOfAccounts.jsx';
 import JournalEntryList from './pages/GL/JournalEntryList.jsx';
 import JournalEntryCreate from './pages/GL/JournalEntryCreate.jsx';
@@ -38,6 +41,7 @@ import AnalyticsHub from './pages/Analytics/AnalyticsHub.jsx';
 import KPITrends from './pages/Analytics/KPITrends.jsx';
 import CashFlow from './pages/Analytics/CashFlow.jsx';
 import VendorAnalytics from './pages/Analytics/VendorAnalytics.jsx';
+import CustomerAnalytics from './pages/Analytics/CustomerAnalytics.jsx';
 import ExportCenter from './pages/Analytics/ExportCenter.jsx';
 import SettingsHub from './pages/Settings/SettingsHub.jsx';
 import CompanySettings from './pages/Settings/CompanySettings.jsx';
@@ -46,6 +50,7 @@ import AuditLogViewer from './pages/Settings/AuditLogViewer.jsx';
 import MyProfile from './pages/Settings/MyProfile.jsx';
 import NotificationCenter from './pages/Notifications/NotificationCenter.jsx';
 import NotFound from './pages/NotFound.jsx';
+import APAgingReport from './pages/Reports/APAgingReport.jsx';
 import ErrorBoundary from './components/common/ErrorBoundary.jsx';
 
 const Soon = ({ label }) => (
@@ -62,6 +67,8 @@ const App = () => (
   <Routes>
     <Route path="/login" element={<Login />} />
     <Route path="/register" element={<Register />} />
+    <Route path="/forgot-password" element={<ForgotPassword />} />
+    <Route path="/reset-password/:token" element={<ResetPassword />} />
     {[
       { path: '/dashboard', el: <Dashboard /> },
       { path: '/vendors', el: <VendorList /> },
@@ -78,6 +85,7 @@ const App = () => (
       { path: '/finance', el: <GLHub /> },
       { path: '/gl', el: <GLHub /> },
       { path: '/gl/accounts', el: <ChartOfAccounts /> },
+      { path: '/gl/fiscal-periods', el: <FiscalPeriods /> },
       { path: '/gl/journal', el: <JournalEntryList /> },
       { path: '/gl/journal/new', el: <JournalEntryCreate /> },
       { path: '/gl/journal/:id', el: <JournalEntryCreate /> },
@@ -104,7 +112,7 @@ const App = () => (
       { path: '/analytics/kpi', el: <KPITrends /> },
       { path: '/analytics/cash-flow', el: <CashFlow /> },
       { path: '/analytics/vendors', el: <VendorAnalytics /> },
-      { path: '/analytics/customers', el: <VendorAnalytics /> },
+      { path: '/analytics/customers', el: <CustomerAnalytics /> },
       { path: '/analytics/export', el: <ExportCenter /> },
       { path: '/settings', el: <SettingsHub /> },
       { path: '/settings/company', el: <CompanySettings /> },
@@ -113,6 +121,7 @@ const App = () => (
       { path: '/settings/profile', el: <MyProfile /> },
       { path: '/admin', el: <SettingsHub /> },
       { path: '/notifications', el: <NotificationCenter /> },
+      { path: '/reports/ap-aging', el: <APAgingReport /> },
       { path: '/reports/*', el: <Soon label="Reports — Phase 9" /> },
       { path: '/admin/*', el: <Soon label="Admin Panel — Phase 9" /> },
     ].map(({ path, el }) => (

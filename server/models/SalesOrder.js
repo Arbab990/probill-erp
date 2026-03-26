@@ -49,4 +49,6 @@ salesOrderSchema.pre('save', async function (next) {
     next();
 });
 
+salesOrderSchema.index({ company: 1, soNumber: 1 }, { unique: true, sparse: true });
+
 export default mongoose.model('SalesOrder', salesOrderSchema);

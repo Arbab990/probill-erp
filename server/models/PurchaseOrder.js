@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const poSchema = new mongoose.Schema(
     {
-        poNumber: { type: String },  // unique per company — no global index needed
+        poNumber: { type: String },  // unique per company — enforced by compound index below
         vendor: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', required: true },
         pr: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseRequisition' },
         items: [
@@ -59,5 +59,7 @@ poSchema.pre('save', async function (next) {
     this.poNumber = `PO-${year}-${String(nextNum).padStart(4, '0')}`;
     next();
 });
+
+poSchema.index({ company: 1, poNumber: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('PurchaseOrder', poSchema);

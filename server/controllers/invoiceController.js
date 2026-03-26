@@ -1,12 +1,110 @@
 import Invoice from '../models/Invoice.js';
 import Vendor from '../models/Vendor.js';
 import Company from '../models/Company.js';
+import Customer from '../models/Customer.js';
+import SalesOrder from '../models/SalesOrder.js';
+import ChartOfAccounts from '../models/ChartOfAccounts.js';
+import JournalEntry from '../models/JournalEntry.js';
 import { generateInvoicePDF } from '../services/pdfService.js';
 import { sendInvoiceEmail } from '../services/emailService.js';
 import { logAudit } from '../services/auditService.js';
 import { notifyCompany } from '../services/notificationService.js';
 
+// ── GL auto-posting helper ────────────────────────────────────────────────────
+// Creates a balanced journal entry when an invoice is sent or paid.
+// Non-critical — if accounts are not seeded yet, it logs and continues silently.
+const autoPostInvoiceGL = async ({ invoice, company, userId, eventType }) => {
+    try {
+        const [arAccount, apAccount, revenueAccount, bankAccount, expenseAccount] = await Promise.all([
+            ChartOfAccounts.findOne({ company, accountCode: '1100' }), // Accounts Receivable
+            ChartOfAccounts.findOne({ company, accountCode: '2000' }), // Accounts Payable
+            ChartOfAccounts.findOne({ company, accountCode: '4000' }), // Sales Revenue
+            ChartOfAccounts.findOne({ company, accountCode: '1010' }), // Bank Account
+            ChartOfAccounts.findOne({ company, accountCode: '5000' }), // Cost of Goods / Expense
+        ]);
+
+        let lines = [];
+        let narration = '';
+
+        if (eventType === 'send') {
+            if (invoice.type === 'sales' && arAccount && revenueAccount) {
+                // Sales invoice sent → Dr Accounts Receivable / Cr Sales Revenue
+                narration = `Sales Invoice ${invoice.invoiceNo} posted`;
+                lines = [
+                    { account: arAccount._id, accountCode: arAccount.accountCode, accountName: arAccount.accountName, debit: invoice.total, credit: 0, description: `Invoice ${invoice.invoiceNo}` },
+                    { account: revenueAccount._id, accountCode: revenueAccount.accountCode, accountName: revenueAccount.accountName, debit: 0, credit: invoice.total, description: `Revenue from ${invoice.invoiceNo}` },
+                ];
+            } else if (invoice.type === 'purchase' && expenseAccount && apAccount) {
+                // Purchase invoice sent → Dr Expense / Cr Accounts Payable
+                narration = `Purchase Invoice ${invoice.invoiceNo} recorded`;
+                lines = [
+                    { account: expenseAccount._id, accountCode: expenseAccount.accountCode, accountName: expenseAccount.accountName, debit: invoice.total, credit: 0, description: `Purchase ${invoice.invoiceNo}` },
+                    { account: apAccount._id, accountCode: apAccount.accountCode, accountName: apAccount.accountName, debit: 0, credit: invoice.total, description: `Payable for ${invoice.invoiceNo}` },
+                ];
+            }
+        } else if (eventType === 'paid') {
+            if (invoice.type === 'sales' && bankAccount && arAccount) {
+                // Sales invoice paid → Dr Bank / Cr Accounts Receivable (clearing)
+                narration = `Payment received for Invoice ${invoice.invoiceNo}`;
+                lines = [
+                    { account: bankAccount._id, accountCode: bankAccount.accountCode, accountName: bankAccount.accountName, debit: invoice.total, credit: 0, description: `Payment for ${invoice.invoiceNo}` },
+                    { account: arAccount._id, accountCode: arAccount.accountCode, accountName: arAccount.accountName, debit: 0, credit: invoice.total, description: `AR clearing ${invoice.invoiceNo}` },
+                ];
+            } else if (invoice.type === 'purchase' && apAccount && bankAccount) {
+                // Purchase invoice paid → Dr Accounts Payable / Cr Bank (clearing)
+                narration = `Payment made for Invoice ${invoice.invoiceNo}`;
+                lines = [
+                    { account: apAccount._id, accountCode: apAccount.accountCode, accountName: apAccount.accountName, debit: invoice.total, credit: 0, description: `AP clearing ${invoice.invoiceNo}` },
+                    { account: bankAccount._id, accountCode: bankAccount.accountCode, accountName: bankAccount.accountName, debit: 0, credit: invoice.total, description: `Payment for ${invoice.invoiceNo}` },
+                ];
+            }
+        }
+
+        // If required accounts not seeded yet — skip silently, never block the operation
+        if (!lines.length) return null;
+
+        const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
+        const totalCredit = lines.reduce((s, l) => s + l.credit, 0);
+
+        const entry = await JournalEntry.create({
+            date: new Date(),
+            narration,
+            lines,
+            totalDebit,
+            totalCredit,
+            isBalanced: Math.abs(totalDebit - totalCredit) < 0.01,
+            sourceType: 'invoice',
+            sourceId: invoice._id,
+            sourceRef: invoice.invoiceNo,
+            status: 'posted',
+            postedBy: userId,
+            postedAt: new Date(),
+            company,
+        });
+
+        // Update running balance on each affected account
+        for (const line of lines) {
+            const account = await ChartOfAccounts.findById(line.account);
+            if (!account) continue;
+            const balanceChange = account.normalBalance === 'debit'
+                ? (line.debit - line.credit)
+                : (line.credit - line.debit);
+            await ChartOfAccounts.findByIdAndUpdate(line.account, {
+                $inc: { currentBalance: balanceChange },
+            });
+        }
+
+        return entry;
+    } catch (err) {
+        // Non-critical — log but never block the invoice operation
+        console.error('Auto GL posting error (non-critical):', err.message);
+        return null;
+    }
+};
+
+// ════════════════════════════════════════════════
 // GET /api/invoices
+// ════════════════════════════════════════════════
 export const getInvoices = async (req, res, next) => {
     try {
         const { page = 1, limit = 10, type = '', status = '', search = '' } = req.query;
@@ -32,7 +130,9 @@ export const getInvoices = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// ════════════════════════════════════════════════
 // GET /api/invoices/:id
+// ════════════════════════════════════════════════
 export const getInvoice = async (req, res, next) => {
     try {
         const invoice = await Invoice.findOne({ _id: req.params.id, company: req.user.company })
@@ -44,12 +144,13 @@ export const getInvoice = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// ════════════════════════════════════════════════
 // POST /api/invoices
+// ════════════════════════════════════════════════
 export const createInvoice = async (req, res, next) => {
     try {
         const { lineItems = [], ...rest } = req.body;
 
-        // Calculate totals
         const calculatedItems = lineItems.map(item => {
             const subtotal = item.quantity * item.unitPrice;
             const taxAmount = (subtotal * (item.taxRate || 0)) / 100;
@@ -76,7 +177,9 @@ export const createInvoice = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// ════════════════════════════════════════════════
 // PUT /api/invoices/:id
+// ════════════════════════════════════════════════
 export const updateInvoice = async (req, res, next) => {
     try {
         const existing = await Invoice.findOne({ _id: req.params.id, company: req.user.company });
@@ -103,7 +206,9 @@ export const updateInvoice = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// ════════════════════════════════════════════════
 // DELETE /api/invoices/:id
+// ════════════════════════════════════════════════
 export const deleteInvoice = async (req, res, next) => {
     try {
         const invoice = await Invoice.findOne({ _id: req.params.id, company: req.user.company });
@@ -115,7 +220,9 @@ export const deleteInvoice = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// ════════════════════════════════════════════════
 // PUT /api/invoices/:id/status
+// ════════════════════════════════════════════════
 export const updateInvoiceStatus = async (req, res, next) => {
     try {
         const { status } = req.body;
@@ -131,13 +238,25 @@ export const updateInvoiceStatus = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// POST /api/invoices/:id/send  — generate PDF + email
+// ════════════════════════════════════════════════
+// POST /api/invoices/:id/send
+// FIX #2  — Guard against re-sending paid/cancelled invoices
+// FIX #11 — Auto-post GL journal entry on first send (draft → sent only)
+// ════════════════════════════════════════════════
 export const sendInvoice = async (req, res, next) => {
     try {
         const invoice = await Invoice.findOne({ _id: req.params.id, company: req.user.company })
             .populate('vendor', 'name email phone gstin address')
             .populate('customer', 'name email phone gstin');
         if (!invoice) return res.status(404).json({ success: false, error: 'Invoice not found' });
+
+        // FIX #2: Never revert a paid or cancelled invoice back to 'sent'
+        if (['paid', 'cancelled'].includes(invoice.status)) {
+            return res.status(400).json({
+                success: false,
+                error: `Cannot send a ${invoice.status} invoice. Only draft or sent/overdue invoices can be emailed.`,
+            });
+        }
 
         const company = await Company.findById(req.user.company);
         const pdfBuffer = await generateInvoicePDF(invoice, company);
@@ -154,13 +273,33 @@ export const sendInvoice = async (req, res, next) => {
             });
         }
 
-        await Invoice.findByIdAndUpdate(invoice._id, { status: 'sent' });
+        // Only move status to 'sent' when currently draft
+        // Re-sending an overdue/partially_paid invoice preserves its status
+        const wasDraft = invoice.status === 'draft';
+        if (wasDraft) {
+            await Invoice.findByIdAndUpdate(invoice._id, { status: 'sent' });
+        }
+
+        // FIX #11: Auto-post GL entry on first send only (draft → sent)
+        // Sales:    Dr Accounts Receivable (1100) / Cr Sales Revenue (4000)
+        // Purchase: Dr Expense (5000)            / Cr Accounts Payable (2000)
+        if (wasDraft) {
+            await autoPostInvoiceGL({
+                invoice,
+                company: req.user.company,
+                userId: req.user._id,
+                eventType: 'send',
+            });
+        }
+
         await logAudit({ action: 'INVOICE_SENT', module: 'invoices', description: `Invoice ${invoice.invoiceNo} sent to ${party?.email || 'recipient'}`, performedBy: req.user._id, performedByName: req.user.name, targetId: invoice._id, targetRef: 'Invoice', severity: 'info', company: req.user.company, req });
         res.json({ success: true, message: `Invoice sent to ${party?.email || 'recipient'}` });
     } catch (err) { next(err); }
 };
 
+// ════════════════════════════════════════════════
 // GET /api/invoices/:id/pdf
+// ════════════════════════════════════════════════
 export const downloadInvoicePDF = async (req, res, next) => {
     try {
         const invoice = await Invoice.findOne({ _id: req.params.id, company: req.user.company })
@@ -176,22 +315,53 @@ export const downloadInvoicePDF = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// ... (keep exact same imports and initial logic)
-import SalesOrder from '../models/SalesOrder.js';
-
+// ════════════════════════════════════════════════
 // POST /api/invoices/:id/payment
+// FIX #4  — Validate amount > 0, guard against double-payment
+// FIX #4  — Decrement customer outstandingBalance when fully paid
+// FIX #11 — Auto-post GL clearing entry when invoice becomes fully paid
+// ════════════════════════════════════════════════
 export const recordPayment = async (req, res, next) => {
     try {
         const { amount, method, reference } = req.body;
+
+        // FIX #4: Reject zero or missing amount
+        if (!amount || parseFloat(amount) <= 0) {
+            return res.status(400).json({ success: false, error: 'Payment amount must be greater than zero' });
+        }
+
         const invoice = await Invoice.findOne({ _id: req.params.id, company: req.user.company });
         if (!invoice) return res.status(404).json({ success: false, error: 'Invoice not found' });
+        if (invoice.status === 'paid') {
+            return res.status(400).json({ success: false, error: 'Invoice is already fully paid' });
+        }
 
-        invoice.paymentHistory.push({ amount, method, reference });
+        invoice.paymentHistory.push({ amount: parseFloat(amount), method, reference });
         const totalPaid = invoice.paymentHistory.reduce((sum, p) => sum + p.amount, 0);
+        const wasAlreadyPaid = invoice.status === 'paid';
         invoice.status = totalPaid >= invoice.total ? 'paid' : 'partially_paid';
         await invoice.save();
 
-        // If this is a fully paid sales invoice, update the corresponding Sales Order status
+        // FIX #4: Decrement customer outstandingBalance when sales invoice is fully paid
+        if (invoice.type === 'sales' && invoice.status === 'paid' && !wasAlreadyPaid && invoice.customer) {
+            await Customer.findByIdAndUpdate(invoice.customer, {
+                $inc: { outstandingBalance: -invoice.total },
+            });
+        }
+
+        // FIX #11: Auto-post GL clearing entry when invoice becomes fully paid
+        // Sales paid:    Dr Bank (1010)             / Cr Accounts Receivable (1100)
+        // Purchase paid: Dr Accounts Payable (2000) / Cr Bank (1010)
+        if (invoice.status === 'paid' && !wasAlreadyPaid) {
+            await autoPostInvoiceGL({
+                invoice,
+                company: req.user.company,
+                userId: req.user._id,
+                eventType: 'paid',
+            });
+        }
+
+        // Update linked Sales Order status when sales invoice is fully paid
         if (invoice.type === 'sales' && invoice.status === 'paid') {
             const linkedSO = await SalesOrder.findOne({ invoiceLinked: invoice._id, company: req.user.company });
             if (linkedSO && linkedSO.status !== 'paid') {

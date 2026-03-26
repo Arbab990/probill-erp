@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import connectDB from './config/db.js';
+import { startCronJobs } from './services/cronService.js';
+import fiscalPeriodRoutes from './routes/fiscalPeriodRoutes.js';
 import errorHandler from './middleware/errorMiddleware.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import authRoutes from './routes/authRoutes.js';
@@ -23,6 +25,7 @@ import searchRoutes from './routes/searchRoutes.js';
 
 dotenv.config();
 connectDB();
+startCronJobs();
 
 const app = express();
 
@@ -49,6 +52,7 @@ app.use('/api/gl', glRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/fiscal-periods', fiscalPeriodRoutes);
 app.use('/api/search', searchRoutes);
 
 app.use((req, res) => {

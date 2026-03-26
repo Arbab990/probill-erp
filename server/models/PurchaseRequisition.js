@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const prSchema = new mongoose.Schema(
     {
-        prNumber: { type: String },  // unique per company — no global index needed
+        prNumber: { type: String },  // unique per company — enforced by compound index below
         requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         department: { type: String, trim: true },
         items: [
@@ -45,5 +45,7 @@ prSchema.pre('save', async function (next) {
     this.prNumber = `PR-${year}-${String(nextNum).padStart(4, '0')}`;
     next();
 });
+
+prSchema.index({ company: 1, prNumber: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('PurchaseRequisition', prSchema);

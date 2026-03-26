@@ -107,3 +107,48 @@ Respond ONLY with valid JSON:
     const clean = text.replace(/```json|```/g, '').trim();
     return JSON.parse(clean);
 };
+// ── 6. Late Payer Prediction ──────────────────────────────────────────────────
+export const predictLatePayers = async (customers) => {
+    const prompt = `
+You are an accounts receivable analyst. Based on this customer data, predict the likelihood each customer will pay late.
+
+Customers: ${JSON.stringify(customers.slice(0, 15).map(c => ({
+        name: c.name,
+        outstandingBalance: c.outstandingBalance,
+        creditLimit: c.creditLimit,
+        latePaymentCount: c.latePaymentCount || 0,
+        paymentTerms: c.paymentTerms,
+        status: c.status,
+    })))}
+
+Respond ONLY with valid JSON:
+{"predictions": [{"customerName": "<name>", "likelihood": "high|medium|low", "reason": "<one sentence>"}], "summary": "<1 sentence overall AR health>"}
+`;
+    const text = await callGemini(prompt);
+    const clean = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean);
+};
+
+// ── 7. Natural Language Query → MongoDB Filter ────────────────────────────────
+export const naturalLanguageQuery = async (query, availableFields) => {
+    const prompt = `
+You are a MongoDB query builder for an ERP system. Convert this natural language query into a MongoDB filter object.
+
+Available fields: ${JSON.stringify(availableFields)}
+User query: "${query}"
+
+Rules:
+- Return ONLY valid JSON — a MongoDB filter object
+- Use $gte/$lte for date ranges, $in for arrays, $regex for text search
+- For dates, use ISO string format
+- If the query is ambiguous, return a reasonable interpretation
+- Never include fields not in the available fields list
+
+Example: "overdue invoices from last month" → {"status": "overdue", "dueDate": {"$lte": "<last month ISO date>"}}
+
+Respond ONLY with valid JSON — the filter object, nothing else.
+`;
+    const text = await callGemini(prompt);
+    const clean = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean);
+};

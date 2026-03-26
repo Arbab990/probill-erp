@@ -1,4 +1,6 @@
 import Vendor from '../models/Vendor.js';
+import PurchaseOrder from '../models/PurchaseOrder.js';
+import Invoice from '../models/Invoice.js';
 import { logAudit } from '../services/auditService.js';
 import { notifyCompany } from '../services/notificationService.js';
 
@@ -84,10 +86,37 @@ export const updateVendor = async (req, res, next) => {
 };
 
 // DELETE /api/vendors/:id
+// FIXED: Referential integrity — block delete if active POs or invoices exist
 export const deleteVendor = async (req, res, next) => {
     try {
-        const vendor = await Vendor.findOneAndDelete({ _id: req.params.id, company: req.user.company });
+        const vendor = await Vendor.findOne({ _id: req.params.id, company: req.user.company });
         if (!vendor) return res.status(404).json({ success: false, error: 'Vendor not found' });
+
+        // Block deletion if open Purchase Orders reference this vendor
+        const linkedPOCount = await PurchaseOrder.countDocuments({
+            vendor: vendor._id,
+            status: { $nin: ['cancelled', 'closed'] },
+        });
+        if (linkedPOCount > 0) {
+            return res.status(409).json({
+                success: false,
+                error: `Cannot delete vendor "${vendor.name}" — they have ${linkedPOCount} active purchase order(s). Close or cancel all POs first, or blacklist the vendor instead.`,
+            });
+        }
+
+        // Block deletion if outstanding unpaid invoices reference this vendor
+        const linkedInvoiceCount = await Invoice.countDocuments({
+            vendor: vendor._id,
+            status: { $nin: ['paid', 'cancelled'] },
+        });
+        if (linkedInvoiceCount > 0) {
+            return res.status(409).json({
+                success: false,
+                error: `Cannot delete vendor "${vendor.name}" — they have ${linkedInvoiceCount} outstanding invoice(s). Settle all invoices first.`,
+            });
+        }
+
+        await vendor.deleteOne();
         await logAudit({
             action: 'VENDOR_DELETED',
             module: 'vendors',

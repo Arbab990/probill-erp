@@ -175,6 +175,39 @@ export const createPurchaseOrder = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
+// PUT /api/purchase/orders/:id  — edit a draft PO
+export const updatePurchaseOrder = async (req, res, next) => {
+    try {
+        const po = await PurchaseOrder.findOne({ _id: req.params.id, company: req.user.company });
+        if (!po) return res.status(404).json({ success: false, error: 'Purchase order not found' });
+        if (po.status !== 'draft') {
+            return res.status(400).json({ success: false, error: `Only draft POs can be edited. This PO is "${po.status}".` });
+        }
+
+        const { items = [], ...rest } = req.body;
+        const calculatedItems = items.map(item => {
+            const subtotal = (item.quantity || 0) * (item.unitPrice || 0);
+            const taxAmount = (subtotal * (item.taxRate || 0)) / 100;
+            return { ...item, taxAmount, total: subtotal + taxAmount };
+        });
+
+        const subtotal = calculatedItems.reduce((s, i) => s + ((i.quantity || 0) * (i.unitPrice || 0)), 0);
+        const totalTax = calculatedItems.reduce((s, i) => s + (i.taxAmount || 0), 0);
+
+        Object.assign(po, {
+            ...rest,
+            items: calculatedItems,
+            subtotal,
+            totalTax,
+            totalAmount: subtotal + totalTax,
+        });
+        await po.save();
+
+        await logAudit({ action: 'PO_UPDATED', module: 'purchase', description: `Purchase Order ${po.poNumber} updated`, performedBy: req.user._id, performedByName: req.user.name, targetId: po._id, targetRef: 'PurchaseOrder', severity: 'info', company: req.user.company, req });
+        res.json({ success: true, message: 'Purchase order updated', data: po });
+    } catch (err) { next(err); }
+};
+
 // PUT /api/purchase/orders/:id/status
 export const updatePOStatus = async (req, res, next) => {
     try {
@@ -270,21 +303,36 @@ export const createGRN = async (req, res, next) => {
 // 3-WAY MATCH
 // ════════════════════════════════════════════════
 
+const PRICE_TOLERANCE_PCT = 5; // Allow up to 5% variance between PO and invoice amount
+
 const runThreeWayMatch = async (poId) => {
     const po = await PurchaseOrder.findById(poId).populate('grnLinked').populate('invoiceLinked');
     if (!po) return;
 
-    // Need: PO exists + at least one GRN + invoice linked
+    // Need at least one GRN to run match
     if (!po.grnLinked?.length) return;
 
+    // ── Quantity check ────────────────────────────────────────────────────────
     const totalOrdered = po.items.reduce((s, i) => s + (i.quantity || 0), 0);
     const totalReceived = po.grnLinked.reduce((sum, grn) =>
         sum + grn.items.reduce((s, i) => s + (i.receivedQty || 0), 0), 0);
 
     const qtyMatch = totalReceived >= totalOrdered;
-    const hasDiscrepancy = po.grnLinked.some(g => g.status === 'discrepancy');
+    const hasGrnDiscrepancy = po.grnLinked.some(g => g.status === 'discrepancy');
 
-    po.threeWayMatchStatus = (qtyMatch && !hasDiscrepancy) ? 'matched' : 'discrepancy';
+    // ── Price / amount check (when invoice is linked) ─────────────────────────
+    let priceMatch = true; // default pass if no invoice linked yet
+    if (po.invoiceLinked) {
+        const invoiceTotal = po.invoiceLinked.total || 0;
+        const poTotal = po.totalAmount || 0;
+        if (poTotal > 0) {
+            const variance = Math.abs(invoiceTotal - poTotal) / poTotal * 100;
+            priceMatch = variance <= PRICE_TOLERANCE_PCT;
+        }
+    }
+
+    // All three legs must pass for a clean match
+    po.threeWayMatchStatus = (qtyMatch && !hasGrnDiscrepancy && priceMatch) ? 'matched' : 'discrepancy';
     await po.save();
 };
 

@@ -87,7 +87,12 @@ const Login = () => {
                             <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@company.com" className="input-field" autoFocus />
                         </div>
                         <div>
-                            <label className="input-label">Password</label>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="input-label mb-0">Password</label>
+                                <Link to="/forgot-password" className="text-xs text-primary-light hover:text-primary transition-colors">
+                                    Forgot password?
+                                </Link>
+                            </div>
                             <div className="relative">
                                 <input type={showPw ? 'text' : 'password'} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="••••••••" className="input-field pr-12" />
                                 <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">

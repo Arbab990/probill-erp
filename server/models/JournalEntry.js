@@ -11,7 +11,7 @@ const journalLineSchema = new mongoose.Schema({
 
 const journalEntrySchema = new mongoose.Schema(
     {
-        entryNo: { type: String },  // unique per company — no global index needed
+        entryNo: { type: String },  // unique per company — enforced by compound index below
         date: { type: Date, default: Date.now, required: true },
         narration: { type: String, required: true, trim: true },
         lines: [journalLineSchema],
@@ -62,5 +62,7 @@ journalEntrySchema.pre('save', async function (next) {
     this.entryNo = `JE-${year}-${String(nextNum).padStart(5, '0')}`;
     next();
 });
+
+journalEntrySchema.index({ company: 1, entryNo: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model('JournalEntry', journalEntrySchema);
