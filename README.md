@@ -47,8 +47,8 @@ The project is split into a React client and a Node.js/Express server, with Mong
 | <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/file-text.svg" width="18" align="center" /> **pdfkit** | Server-side PDF generation |
 | <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/brain-circuit.svg" width="18" align="center" /> **@google/generative-ai** | Gemini AI SDK |
 | <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/clock.svg" width="18" align="center" /> **node-cron** | Recurring invoice and overdue reminders |
-| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/upload-cloud.svg" width="18" align="center" /> **multer** | File/document uploads |
-| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/check-circle-2.svg" width="18" align="center" /> **express-validator** | Request body validation |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/cloud-upload.svg" width="18" align="center" /> **multer** | File/document uploads |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/check-circle.svg" width="18" align="center" /> **express-validator** | Request body validation |
 | <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/terminal.svg" width="18" align="center" /> **morgan** | HTTP request logging |
 
 ---
