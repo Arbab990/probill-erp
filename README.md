@@ -24,7 +24,7 @@ The project is split into a React client and a Node.js/Express server, with Mong
 | <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/milestone.svg" width="18" align="center" /> **React Router 6** | Client-side routing |
 | <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/box.svg" width="18" align="center" /> **Zustand 4** | Lightweight state management |
 | <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/arrow-left-right.svg" width="18" align="center" /> **Axios 1.6** | HTTP client with interceptors |
-| <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/bar-chart-3.svg" width="18" align="center" /> **Recharts 2.8** | Dashboard charts |
+| <img src="https://cdn.jsdelivr.net/npm/lucide-static@latest/icons/line-chart.svg" width="18" align="center" /> **Recharts 2.8** | Dashboard charts |
 | <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/clipboard-check.svg" width="18" align="center" /> **React Hook Form 7** | Form handling and validation |
 | <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/table.svg" width="18" align="center" /> **@tanstack/react-table 8** | Headless data tables |
 | <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg" width="18" align="center" /> **lucide-react** | Icon library |
