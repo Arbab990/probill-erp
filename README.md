@@ -63,7 +63,7 @@ The project is split into a React client and a Node.js/Express server, with Mong
 
 | Module | Description |
 |---|---|
-| **Authentication** | Register, login, logout, JWT, profile, password update |
+| **Authentication** | Register, login, logout, JWT, profile, password update, forgot/reset password |
 | **Dashboard** | KPI cards, revenue trend chart, invoice status breakdown, AI financial summary |
 | **Vendors** | Full CRUD, status management (pending → verified → blacklisted), AI risk scoring |
 | **Billing** | Sales and purchase invoices, payment recording, PDF generation, email sending |
@@ -71,6 +71,7 @@ The project is split into a React client and a Node.js/Express server, with Mong
 | **Orders (O2C)** | Customers, sales orders, delivery notes, invoice generation, AR aging |
 | **Payments** | Pending invoice selection, SAP-style payment proposal, approval, execution, CSV bank export |
 | **General Ledger (R2R)** | Chart of accounts, journal entries, posting, reversal, trial balance, P&L, balance sheet |
+| **Fiscal Periods** | Lock/unlock accounting periods to prevent backdated journal entries |
 | **Analytics** | Cash flow, KPI trends, vendor/customer analytics, Excel export, AI summaries |
 | **AI Features** | 7 Gemini-powered features across the application |
 | **Settings / Admin** | Company profile, user management, role changes, tax config, audit logs |
@@ -219,7 +220,7 @@ probill-erp/
 │
 └── server/                     # Express + MongoDB backend
     ├── controllers/            # authController, vendorController, invoiceController, etc.
-    ├── models/                 # 14 Mongoose models
+    ├── models/                 # 15 Mongoose models
     ├── routes/                 # Route files per domain
     ├── middleware/             # authMiddleware, rbacMiddleware, auditMiddleware, errorMiddleware, rateLimiter
     ├── services/               # geminiService, emailService, pdfService, notificationService
@@ -248,6 +249,7 @@ All endpoints are served under `/api`.
 | Reports | `/api/reports` | Dashboard KPIs, AR/AP aging |
 | AI | `/api/ai` | financial-summary, vendor-risk, predict-late-payers, payment-timing, journal-anomaly, invoice-description, nl-query |
 | Admin | `/api/admin` | User management, role changes, audit logs, company settings, tax config |
+| Fiscal Periods | `/api/fiscal-periods` | List periods, lock, unlock |
 | Notifications | `/api/notifications` | Inbox, unread count, mark read, clear |
 | Search | `/api/search` | Global search |
 | Health | `/api/health` | Server health check |
@@ -266,6 +268,7 @@ All endpoints are served under `/api`.
 # Backend
 cd server
 npm install
+npm install node-cron  # required for recurring invoices and overdue cron
 
 # Frontend
 cd ../client
@@ -364,9 +367,12 @@ Register the first user with a `companyName` to auto-create the company and assi
 - Add a root-level `package.json` with workspace scripts to start both apps together (`npm run dev`)
 - Add `.env.example` files for both client and server
 - Remove committed `node_modules` from version control — add to `.gitignore`
+-  After cloning, run `cd server && npm install node-cron` — required for recurring invoice and overdue cron jobs
 - Add automated tests for controllers, services, and critical UI flows
 - Add an OpenAPI/Swagger spec for the API surface
 - Add seed scripts for demo chart of accounts and initial data
+-  Mongoose transactions (payment run execution) require MongoDB Atlas or a replica set — standalone local MongoDB will throw an error on execute
+- Fiscal periods are auto-generated for the last 13 months on first visit to GL → Fiscal Periods
 
 ---
 
