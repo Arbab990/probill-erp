@@ -1,6 +1,6 @@
  #  <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/zap.svg" width="24" height="24" /> ProBill ERP 
 
-**SAP S/4 HANA-Inspired Professional Billing & Financial Management Software**
+**<img src="https://sap.github.io/ui5-webcomponents/assets/images/icons/sap-icons/business-suite.svg" width="32" vertical-align="middle" />SAP S/4 HANA-Inspired Professional Billing & Financial Management Software**
 MERN Stack · Tailwind CSS · Google Gemini AI · 100% Free Tier
 
 ---
