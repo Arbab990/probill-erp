@@ -1,4 +1,4 @@
-# 💼 ProBill ERP
+ # <lucide-react-zap /> ProBill ERP
 
 **SAP S/4 HANA-Inspired Professional Billing & Financial Management Software**
 MERN Stack · Tailwind CSS · Google Gemini AI · 100% Free Tier
